@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -11,18 +12,30 @@ public class PlayerController : MonoBehaviour
 
     private Rigidbody2D rb;
     private BoxCollider2D coll;
+    private SpriteRenderer spriteRenderer;
     private bool isGrounded;
+    [SerializeField] private Animator _animator;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         coll = GetComponent<BoxCollider2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     void Update()
     {
         // Horizontal movement
         float move = Input.GetAxis("Horizontal");
+        if (move != 0)
+        {
+            spriteRenderer.flipX = move < 0f;
+            _animator.SetBool("isRunning", true);
+        }
+        else
+        {
+            _animator.SetBool("isRunning", false);
+        }
         rb.velocity = new Vector2(move * moveSpeed, rb.velocity.y);
 
         // Ground check - cast slightly smaller box to avoid self-collision
