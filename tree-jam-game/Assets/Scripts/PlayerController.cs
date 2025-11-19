@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using Cinemachine;
 
 public class PlayerController : MonoBehaviour
 {
@@ -36,6 +37,12 @@ public class PlayerController : MonoBehaviour
     private int cloneGroundLayer = -1;
     // ---------------------------------------------------------------
 
+    public float cameraShakeDuration = 0.3f;
+    public float cameraShakeIntensity = 0.2f;
+    public Camera mainCamera;
+    private Vector3 originalCameraPosition;
+    [SerializeField] private CinemachineImpulseSource impulseSource;
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -50,6 +57,11 @@ public class PlayerController : MonoBehaviour
             {
                 cloneGroundLayer = resolvedLayer;
             }
+        }
+
+        if (mainCamera != null)
+        {
+            originalCameraPosition = mainCamera.transform.position;
         }
     }
 
@@ -120,6 +132,7 @@ public class PlayerController : MonoBehaviour
         // -------------------- CLONE SPAWN KEY --------------------
         if (Input.GetKeyDown(KeyCode.C))
         {
+            // StartCoroutine(CameraShake());
             SpawnClone();
         }
         // ----------------------------------------------------------
@@ -168,6 +181,7 @@ public class PlayerController : MonoBehaviour
     // ----------------------------- CLONE FUNCTIONALITY -----------------------------
     private void SpawnClone()
     {
+        ShakeCamera();
         GameObject source = clonePrefab != null ? clonePrefab : gameObject;
         GameObject clone = Instantiate(source, transform.position, transform.rotation);
         clone.name = $"{gameObject.name}_Clone";
@@ -189,11 +203,11 @@ public class PlayerController : MonoBehaviour
         }
 
         // disable animation
-        Animator cloneAnimator = clone.GetComponent<Animator>();
-        if (cloneAnimator != null)
-        {
-            cloneAnimator.enabled = false;
-        }
+        // Animator cloneAnimator = clone.GetComponent<Animator>();
+        // if (cloneAnimator != null)
+        // {
+        //     cloneAnimator.enabled = false;
+        // }
 
         // adjust physics
         Rigidbody2D cloneRb = clone.GetComponent<Rigidbody2D>();
@@ -238,5 +252,27 @@ public class PlayerController : MonoBehaviour
             SetLayerRecursively(target.GetChild(i), layer);
         }
     }
+
+private void ShakeCamera()
+{
+    Debug.Log("ShakeCamera called!");
+    
+    if (impulseSource != null)
+    {
+        Debug.Log("Generating impulse with source: " + impulseSource.name);
+        
+        // Check if any listeners exist
+        var listeners1 = FindObjectsOfType<CinemachineImpulseListener>();
+        var listeners2 = FindObjectsOfType<CinemachineIndependentImpulseListener>();
+        Debug.Log("Found " + listeners1.Length + " CinemachineImpulseListener");
+        Debug.Log("Found " + listeners2.Length + " CinemachineIndependentImpulseListener");
+
+        impulseSource.GenerateImpulseWithForce(1f);
+    }
+    else
+    {
+        Debug.LogError("Impulse Source is NULL!");
+    }
+}
     // ------------------------------------------------------------------------------
 }
