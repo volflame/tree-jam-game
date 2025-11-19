@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -9,20 +10,31 @@ public class PlayerController : MonoBehaviour
     public LayerMask Ground;
     public float groundCheckDistance = 0.1f; // adjustable in inspector
 
+    private Rigidbody2D rb;
+    private BoxCollider2D coll;
+    private SpriteRenderer spriteRenderer;
+    private bool isGrounded;
+    private bool doubleJump = true;
+
+    private bool canDash = true;
+    private bool isDashing;
+    public float dashingPower = 24f;
+    private float dashingTime = 0.2f;
+    private float dashingCooldown = 1f;
+    private float move;
+
+    [SerializeField] private Animator _animator;
+    [SerializeField] private TrailRenderer _trailRenderer;
+
+    // -------------------- CLONE FIELDS (added) --------------------
     [SerializeField] private GameObject clonePrefab;
     [SerializeField] private float cloneMass = 5f;
     [SerializeField] private float cloneLinearDrag = 1f;
     [SerializeField] private Color cloneTint = new Color(1f, 1f, 1f, 0.5f);
     [SerializeField] private string cloneGroundLayerName = "Ground";
 
-    private Rigidbody2D rb;
-    private BoxCollider2D coll;
-    private SpriteRenderer spriteRenderer;
-    private bool isGrounded;
-    private float move;
     private int cloneGroundLayer = -1;
-
-    [SerializeField] private Animator _animator;
+    // ---------------------------------------------------------------
 
     void Start()
     {
@@ -30,6 +42,7 @@ public class PlayerController : MonoBehaviour
         coll = GetComponent<BoxCollider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
 
+        // clone layer setup
         if (!string.IsNullOrEmpty(cloneGroundLayerName))
         {
             int resolvedLayer = LayerMask.NameToLayer(cloneGroundLayerName);
@@ -42,6 +55,11 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (isDashing)
+        {
+            return;
+        }
+
         // Horizontal movement
         move = Input.GetAxis("Horizontal");
 
@@ -54,6 +72,12 @@ public class PlayerController : MonoBehaviour
         else
         {
             _animator.SetBool("isRunning", false);
+        }
+
+        // double jump reset
+        if (isGrounded && !Input.GetButton("Jump"))
+        {
+            doubleJump = false;
         }
 
         rb.velocity = new Vector2(move * moveSpeed, rb.velocity.y);
@@ -70,20 +94,35 @@ public class PlayerController : MonoBehaviour
 
         isGrounded = hit.collider != null;
 
-        // Reset double jump when landing
-        // Jump (single jump only)
-        if (Input.GetKeyDown(KeyCode.Space))
+        // Jump
+        if (Input.GetKeyDown(KeyCode.Space) && (isGrounded || doubleJump))
         {
-            if (isGrounded)
+            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+
+            if (!isGrounded && doubleJump)
             {
-                rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+                _animator.SetBool("isDoubleJumping", true);
             }
+            else
+            {
+                _animator.SetBool("isDoubleJumping", false);
+            }
+
+            doubleJump = !doubleJump;
         }
 
+        // Dash
+        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash)
+        {
+            StartCoroutine(Dash());
+        }
+
+        // -------------------- CLONE SPAWN KEY --------------------
         if (Input.GetKeyDown(KeyCode.C))
         {
             SpawnClone();
         }
+        // ----------------------------------------------------------
     }
 
     // Visual debugging in Scene view
@@ -97,46 +136,79 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawWireCube(boxCenter, boxSize);
     }
 
+    private IEnumerator Dash()
+    {
+        int dashDirection = 0;
+
+        if (move < 0f)
+        {
+            dashDirection = -1;
+        }
+        else
+        {
+            dashDirection = 1;
+        }
+
+        canDash = false;
+        isDashing = true;
+        float originalGravity = rb.gravityScale;
+        rb.gravityScale = 0f;
+        rb.velocity = Vector2.zero; // cancel ANY existing speed
+        rb.AddForce(new Vector2(dashDirection * dashingPower, 0f), ForceMode2D.Impulse);
+        _trailRenderer.emitting = true;
+
+        yield return new WaitForSeconds(dashingTime);
+        _trailRenderer.emitting = false;
+        rb.gravityScale = originalGravity;
+        isDashing = false;
+        yield return new WaitForSeconds(dashingCooldown);
+        canDash = true;
+    }
+
+    // ----------------------------- CLONE FUNCTIONALITY -----------------------------
     private void SpawnClone()
     {
         GameObject source = clonePrefab != null ? clonePrefab : gameObject;
         GameObject clone = Instantiate(source, transform.position, transform.rotation);
         clone.name = $"{gameObject.name}_Clone";
 
-        // Remove Player tag so clones don't trigger player-specific interactions (like portals)
         clone.tag = "Untagged";
 
-        // Remove player-specific behaviour so the clone stays static
+        // remove player script so clone is static
         PlayerController cloneController = clone.GetComponent<PlayerController>();
         if (cloneController != null)
         {
             Destroy(cloneController);
         }
 
+        // remove trail
         TrailRenderer cloneTrail = clone.GetComponent<TrailRenderer>();
         if (cloneTrail != null)
         {
             Destroy(cloneTrail);
         }
 
+        // disable animation
         Animator cloneAnimator = clone.GetComponent<Animator>();
         if (cloneAnimator != null)
         {
             cloneAnimator.enabled = false;
         }
 
+        // adjust physics
         Rigidbody2D cloneRb = clone.GetComponent<Rigidbody2D>();
         if (cloneRb != null)
         {
             cloneRb.velocity = Vector2.zero;
             cloneRb.angularVelocity = 0f;
-            cloneRb.gravityScale = rb != null ? rb.gravityScale : 1f;
+            cloneRb.gravityScale = rb.gravityScale;
             cloneRb.mass = cloneMass;
             cloneRb.drag = cloneLinearDrag;
             cloneRb.bodyType = RigidbodyType2D.Dynamic;
             cloneRb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
 
+        // collider on
         Collider2D cloneCollider = clone.GetComponent<Collider2D>();
         if (cloneCollider != null)
         {
@@ -144,12 +216,14 @@ public class PlayerController : MonoBehaviour
             cloneCollider.isTrigger = false;
         }
 
+        // tint
         SpriteRenderer cloneSprite = clone.GetComponent<SpriteRenderer>();
         if (cloneSprite != null)
         {
             cloneSprite.color = cloneTint;
         }
 
+        // set layer
         if (cloneGroundLayer >= 0)
         {
             SetLayerRecursively(clone.transform, cloneGroundLayer);
@@ -164,4 +238,5 @@ public class PlayerController : MonoBehaviour
             SetLayerRecursively(target.GetChild(i), layer);
         }
     }
+    // ------------------------------------------------------------------------------
 }
