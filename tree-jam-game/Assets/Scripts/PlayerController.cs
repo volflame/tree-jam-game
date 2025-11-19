@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -10,36 +9,39 @@ public class PlayerController : MonoBehaviour
     public LayerMask Ground;
     public float groundCheckDistance = 0.1f; // adjustable in inspector
 
+    [SerializeField] private GameObject clonePrefab;
+    [SerializeField] private float cloneMass = 5f;
+    [SerializeField] private float cloneLinearDrag = 1f;
+    [SerializeField] private Color cloneTint = new Color(1f, 1f, 1f, 0.5f);
+    [SerializeField] private string cloneGroundLayerName = "Ground";
+
     private Rigidbody2D rb;
     private BoxCollider2D coll;
     private SpriteRenderer spriteRenderer;
     private bool isGrounded;
-    private bool doubleJump = true;
-
-    private bool canDash = true;
-    private bool isDashing;
-    public float dashingPower = 24f;
-    private float dashingTime = 0.2f;
-    private float dashingCooldown = 1f;
     private float move;
+    private int cloneGroundLayer = -1;
 
     [SerializeField] private Animator _animator;
-    [SerializeField] private TrailRenderer _trailRenderer;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         coll = GetComponent<BoxCollider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+
+        if (!string.IsNullOrEmpty(cloneGroundLayerName))
+        {
+            int resolvedLayer = LayerMask.NameToLayer(cloneGroundLayerName);
+            if (resolvedLayer != -1)
+            {
+                cloneGroundLayer = resolvedLayer;
+            }
+        }
     }
 
     void Update()
     {
-        if (isDashing)
-        {
-            return;
-        }
-
         // Horizontal movement
         move = Input.GetAxis("Horizontal");
 
@@ -69,34 +71,18 @@ public class PlayerController : MonoBehaviour
         isGrounded = hit.collider != null;
 
         // Reset double jump when landing
-        if (isGrounded)
-        {
-            doubleJump = true;
-            _animator.SetBool("isDoubleJumping", false);
-        }
-
-        // Jump
+        // Jump (single jump only)
         if (Input.GetKeyDown(KeyCode.Space))
         {
             if (isGrounded)
             {
-                // First jump
                 rb.velocity = new Vector2(rb.velocity.x, jumpForce);
-                Debug.Log("First jump executed!");
-            }
-            else if (doubleJump)
-            {
-                // Double jump
-                rb.velocity = new Vector2(rb.velocity.x, jumpForce);
-                doubleJump = false; // Use up the double jump
-                _animator.SetBool("isDoubleJumping", true);
-                Debug.Log("Double jump executed!");
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash)
+        if (Input.GetKeyDown(KeyCode.C))
         {
-            StartCoroutine(Dash());
+            SpawnClone();
         }
     }
 
@@ -111,32 +97,71 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawWireCube(boxCenter, boxSize);
     }
 
-    private IEnumerator Dash()
+    private void SpawnClone()
     {
-        int dashDirection = 0;
+        GameObject source = clonePrefab != null ? clonePrefab : gameObject;
+        GameObject clone = Instantiate(source, transform.position, transform.rotation);
+        clone.name = $"{gameObject.name}_Clone";
 
-        if (move < 0f)
+        // Remove Player tag so clones don't trigger player-specific interactions (like portals)
+        clone.tag = "Untagged";
+
+        // Remove player-specific behaviour so the clone stays static
+        PlayerController cloneController = clone.GetComponent<PlayerController>();
+        if (cloneController != null)
         {
-            dashDirection = -1;
+            Destroy(cloneController);
         }
-        else
+
+        TrailRenderer cloneTrail = clone.GetComponent<TrailRenderer>();
+        if (cloneTrail != null)
         {
-            dashDirection = 1;
+            Destroy(cloneTrail);
         }
 
-        canDash = false;
-        isDashing = true;
-        float originalGravity = rb.gravityScale;
-        rb.gravityScale = 0f;
-        rb.velocity = Vector2.zero; // cancel ANY existing speed
-        rb.AddForce(new Vector2(dashDirection * dashingPower, 0f), ForceMode2D.Impulse);
-        _trailRenderer.emitting = true;
+        Animator cloneAnimator = clone.GetComponent<Animator>();
+        if (cloneAnimator != null)
+        {
+            cloneAnimator.enabled = false;
+        }
 
-        yield return new WaitForSeconds(dashingTime);
-        _trailRenderer.emitting = false;
-        rb.gravityScale = originalGravity;
-        isDashing = false;
-        yield return new WaitForSeconds(dashingCooldown);
-        canDash = true;
+        Rigidbody2D cloneRb = clone.GetComponent<Rigidbody2D>();
+        if (cloneRb != null)
+        {
+            cloneRb.velocity = Vector2.zero;
+            cloneRb.angularVelocity = 0f;
+            cloneRb.gravityScale = rb != null ? rb.gravityScale : 1f;
+            cloneRb.mass = cloneMass;
+            cloneRb.drag = cloneLinearDrag;
+            cloneRb.bodyType = RigidbodyType2D.Dynamic;
+            cloneRb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        }
+
+        Collider2D cloneCollider = clone.GetComponent<Collider2D>();
+        if (cloneCollider != null)
+        {
+            cloneCollider.enabled = true;
+            cloneCollider.isTrigger = false;
+        }
+
+        SpriteRenderer cloneSprite = clone.GetComponent<SpriteRenderer>();
+        if (cloneSprite != null)
+        {
+            cloneSprite.color = cloneTint;
+        }
+
+        if (cloneGroundLayer >= 0)
+        {
+            SetLayerRecursively(clone.transform, cloneGroundLayer);
+        }
+    }
+
+    private void SetLayerRecursively(Transform target, int layer)
+    {
+        target.gameObject.layer = layer;
+        for (int i = 0; i < target.childCount; i++)
+        {
+            SetLayerRecursively(target.GetChild(i), layer);
+        }
     }
 }
