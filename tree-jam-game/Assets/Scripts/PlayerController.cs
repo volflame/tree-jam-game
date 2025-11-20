@@ -324,10 +324,10 @@ public class PlayerController : MonoBehaviour
 
             impulseSource.GenerateImpulseWithForce(1f);
         }
-        else
-        {
-            Debug.LogError("Impulse Source is NULL!");
-        }
+        // else
+        // {
+        //     Debug.LogError("Impulse Source is NULL!");
+        // }
     }
     // ------------------------------------------------------------------------------
 }

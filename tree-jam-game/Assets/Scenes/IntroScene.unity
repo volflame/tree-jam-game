@@ -176,7 +176,7 @@ MonoBehaviour:
   musicSource: {fileID: 998354935}
   backgroundMusic: {fileID: 8300000, guid: e1a21a407a47a0e49a27cf188d01f959, type: 3}
   startGameSound: {fileID: 8300000, guid: 29487a43bbc987d4a8eac73735f690d3, type: 3}
-  nextSceneName: DemoScene
+  nextSceneName: Level 1
 --- !u!4 &440192202
 Transform:
   m_ObjectHideFlags: 0
@@ -417,6 +417,8 @@ MonoBehaviour:
   cloneLinearDrag: 1
   cloneTint: {r: 1, g: 1, b: 1, a: 0.5}
   cloneGroundLayerName: Ground
+  cloneLifetime: 15
+  maxClones: 40
   cameraShakeDuration: 0.3
   cameraShakeIntensity: 0.2
   mainCamera: {fileID: 0}
