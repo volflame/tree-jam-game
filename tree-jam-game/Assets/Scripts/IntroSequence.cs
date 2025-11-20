@@ -46,13 +46,39 @@ public class IntroSequence : MonoBehaviour
     private bool isTransitioning = false;
     private bool isMusicOn = true;
 
+    void Awake()
+    {
+        Debug.Log("IntroSequence: Awake called - Script is attached and active");
+    }
+
     void Start()
     {
+        Debug.Log("IntroSequence: Start called - Beginning intro sequence setup");
+        
+        // Check for null references
+        if (player == null)
+        {
+            Debug.LogError("IntroSequence: Player reference is NULL! Please assign the player GameObject in the inspector.");
+        }
+        if (mainCamera == null)
+        {
+            Debug.LogError("IntroSequence: Main Camera reference is NULL! Please assign the camera in the inspector.");
+        }
+        if (titleCanvasGroup == null)
+        {
+            Debug.LogWarning("IntroSequence: Title CanvasGroup reference is NULL. Title fade-in will be skipped.");
+        }
+        if (ghostPrefab == null)
+        {
+            Debug.LogWarning("IntroSequence: Ghost Prefab reference is NULL. Ghost spawning will be skipped.");
+        }
+
         SetupPlayer();
         SetupCamera();
         SetupUI();
         SetupAudio();
 
+        Debug.Log("IntroSequence: Starting PlayIntroSequence coroutine");
         StartCoroutine(PlayIntroSequence());
     }
 
@@ -156,8 +182,12 @@ public class IntroSequence : MonoBehaviour
 
     IEnumerator PlayIntroSequence()
     {
+        Debug.Log("IntroSequence: PlayIntroSequence coroutine started");
+        
         // Wait for player to fall
         yield return StartCoroutine(PlayerFall());
+        
+        Debug.Log("IntroSequence: Player fall completed");
 
         // Camera shake on landing
         StartCoroutine(CameraShake());

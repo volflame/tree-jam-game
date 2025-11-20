@@ -33,9 +33,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float cloneLinearDrag = 1f;
     [SerializeField] private Color cloneTint = new Color(1f, 1f, 1f, 0.5f);
     [SerializeField] private string cloneGroundLayerName = "Ground";
+    [SerializeField] private float cloneLifetime = 15f;
+    [SerializeField] private int maxClones = 40;
 
     private int cloneGroundLayer = -1;
     // ---------------------------------------------------------------
+    private Vector3 startingPosition;
+    private Queue<GameObject> cloneQueue = new Queue<GameObject>();
 
     public float cameraShakeDuration = 0.3f;
     public float cameraShakeIntensity = 0.2f;
@@ -48,6 +52,7 @@ public class PlayerController : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         coll = GetComponent<BoxCollider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        startingPosition = transform.position;
 
         // clone layer setup
         if (!string.IsNullOrEmpty(cloneGroundLayerName))
@@ -136,6 +141,12 @@ public class PlayerController : MonoBehaviour
             SpawnClone();
         }
         // ----------------------------------------------------------
+
+        // Restart button - reset player position but keep clones
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            ResetPlayerPosition();
+        }
     }
 
     // Visual debugging in Scene view
@@ -181,7 +192,19 @@ public class PlayerController : MonoBehaviour
     // ----------------------------- CLONE FUNCTIONALITY -----------------------------
     private void SpawnClone()
     {
+        // Camera shake when spawning a clone
         ShakeCamera();
+
+        // Remove oldest clone if we've reached the maximum
+        if (cloneQueue.Count >= maxClones)
+        {
+            GameObject oldestClone = cloneQueue.Dequeue();
+            if (oldestClone != null)
+            {
+                Destroy(oldestClone);
+            }
+        }
+
         GameObject source = clonePrefab != null ? clonePrefab : gameObject;
         GameObject clone = Instantiate(source, transform.position, transform.rotation);
         clone.name = $"{gameObject.name}_Clone";
@@ -201,13 +224,6 @@ public class PlayerController : MonoBehaviour
         {
             Destroy(cloneTrail);
         }
-
-        // disable animation
-        // Animator cloneAnimator = clone.GetComponent<Animator>();
-        // if (cloneAnimator != null)
-        // {
-        //     cloneAnimator.enabled = false;
-        // }
 
         // adjust physics
         Rigidbody2D cloneRb = clone.GetComponent<Rigidbody2D>();
@@ -242,6 +258,45 @@ public class PlayerController : MonoBehaviour
         {
             SetLayerRecursively(clone.transform, cloneGroundLayer);
         }
+
+        // Add clone to queue and start despawn coroutine
+        cloneQueue.Enqueue(clone);
+        StartCoroutine(DespawnCloneAfterDelay(clone, cloneLifetime));
+    }
+
+    private IEnumerator DespawnCloneAfterDelay(GameObject clone, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (clone != null)
+        {
+            // Rebuild queue without this clone
+            Queue<GameObject> newQueue = new Queue<GameObject>();
+            while (cloneQueue.Count > 0)
+            {
+                GameObject queuedClone = cloneQueue.Dequeue();
+                if (queuedClone != null && queuedClone != clone)
+                {
+                    newQueue.Enqueue(queuedClone);
+                }
+            }
+            cloneQueue = newQueue;
+
+            Destroy(clone);
+        }
+    }
+
+    private void ResetPlayerPosition()
+    {
+        // Reset player position to starting position
+        transform.position = startingPosition;
+
+        // Reset velocity
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
     }
 
     private void SetLayerRecursively(Transform target, int layer)
@@ -253,26 +308,26 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-private void ShakeCamera()
-{
-    Debug.Log("ShakeCamera called!");
-    
-    if (impulseSource != null)
+    private void ShakeCamera()
     {
-        Debug.Log("Generating impulse with source: " + impulseSource.name);
-        
-        // Check if any listeners exist
-        var listeners1 = FindObjectsOfType<CinemachineImpulseListener>();
-        var listeners2 = FindObjectsOfType<CinemachineIndependentImpulseListener>();
-        Debug.Log("Found " + listeners1.Length + " CinemachineImpulseListener");
-        Debug.Log("Found " + listeners2.Length + " CinemachineIndependentImpulseListener");
+        Debug.Log("ShakeCamera called!");
 
-        impulseSource.GenerateImpulseWithForce(1f);
+        if (impulseSource != null)
+        {
+            Debug.Log("Generating impulse with source: " + impulseSource.name);
+
+            // Check if any listeners exist
+            var listeners1 = FindObjectsOfType<CinemachineImpulseListener>();
+            var listeners2 = FindObjectsOfType<CinemachineIndependentImpulseListener>();
+            Debug.Log("Found " + listeners1.Length + " CinemachineImpulseListener");
+            Debug.Log("Found " + listeners2.Length + " CinemachineIndependentImpulseListener");
+
+            impulseSource.GenerateImpulseWithForce(1f);
+        }
+        else
+        {
+            Debug.LogError("Impulse Source is NULL!");
+        }
     }
-    else
-    {
-        Debug.LogError("Impulse Source is NULL!");
-    }
-}
     // ------------------------------------------------------------------------------
 }
