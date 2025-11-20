@@ -174,8 +174,8 @@ MonoBehaviour:
   buttonsFadeInDelay: 0.5
   buttonsFadeInDuration: 0.8
   musicSource: {fileID: 998354935}
-  backgroundMusic: {fileID: 0}
-  startGameSound: {fileID: 0}
+  backgroundMusic: {fileID: 8300000, guid: e1a21a407a47a0e49a27cf188d01f959, type: 3}
+  startGameSound: {fileID: 8300000, guid: 29487a43bbc987d4a8eac73735f690d3, type: 3}
   nextSceneName: DemoScene
 --- !u!4 &440192202
 Transform:
@@ -420,6 +420,7 @@ MonoBehaviour:
   cameraShakeDuration: 0.3
   cameraShakeIntensity: 0.2
   mainCamera: {fileID: 0}
+  impulseSource: {fileID: 0}
 --- !u!1 &553540437
 GameObject:
   m_ObjectHideFlags: 0
